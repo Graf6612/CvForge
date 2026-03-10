@@ -2,60 +2,44 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@/lib/supabase/server";
 
-// Polyfills for Vercel Node.js environment to support pdf-parse
-// These MUST be defined at the top level before require('pdf-parse')
-if (typeof (global as any).DOMMatrix === 'undefined') {
-  (global as any).DOMMatrix = class DOMMatrix {
-    constructor() {}
-    static fromMatrix() { return new DOMMatrix(); }
-    multiply() { return new DOMMatrix(); }
-  };
-}
-if (typeof (global as any).Path2D === 'undefined') {
-  (global as any).Path2D = class Path2D {
-    constructor() {}
-  };
-}
-if (typeof (global as any).ImageData === 'undefined') {
-  (global as any).ImageData = class ImageData {
-    constructor() {}
-  };
-}
-if (typeof (global as any).DOMException === 'undefined') {
-  (global as any).DOMException = class DOMException extends Error {
-    constructor(message?: string, name?: string) {
-      super(message);
-      this.name = name || 'DOMException';
-    }
-  };
-}
+export const maxDuration = 60;
 
-// Now we can safely require the PDF library
-const pdfParse = require("pdf-parse");
+async function extractTextFromPdf(buffer: Buffer): Promise<string> {
+  // pdfjs-dist is pure JS — no native canvas dependency, works on Vercel
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  pdfjs.GlobalWorkerOptions.workerSrc = "";
 
-export const maxDuration = 60; // This tells Vercel to allow up to 60s for OpenAI generation
+  const loadingTask = pdfjs.getDocument({ data: new Uint8Array(buffer) });
+  const pdf = await loadingTask.promise;
 
-// OpenAI is initialized inside the request to catch missing API key errors safely
+  let fullText = "";
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items.map((item: any) => item.str).join(" ");
+    fullText += pageText + "\n";
+  }
+
+  return fullText.trim();
+}
 
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
 
-    // Initialize OpenAI client inside try/catch so missing keys are reported nicely
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
         { error: "API Ключ OpenAI не налаштовано на сервері (Vercel)." },
         { status: 500 }
       );
     }
-    
+
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
-    
-    // 1. Get current user
+
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
+
     if (authError || !user) {
       return NextResponse.json(
         { error: "Ви повинні бути авторизовані для цього запиту" },
@@ -91,18 +75,20 @@ export async function POST(req: NextRequest) {
 
       const bytes = await resumeFile.arrayBuffer();
       const buffer = Buffer.from(bytes);
-      
+
       try {
-        const data = await pdfParse(buffer);
-        resumeText = data.text;
-        
-        if (!resumeText || resumeText.trim().length === 0) {
-          throw new Error("Не вдалося прочитати текст з цього PDF. Файл може бути пошкодженим або мати лише зображення.");
+        resumeText = await extractTextFromPdf(buffer);
+
+        if (!resumeText || resumeText.length === 0) {
+          return NextResponse.json(
+            { error: "PDF не містить тексту. Можливо, він складається з картинок. Спробуйте інший файл." },
+            { status: 400 }
+          );
         }
       } catch (pdfError: any) {
         console.error("PDF Parse error:", pdfError);
         return NextResponse.json(
-          { error: "Не вдалося розпізнати PDF-файл. Переконайтеся, що файл містить текст, а не лише картинку (або скасуйте пароль)." },
+          { error: "Не вдалося прочитати PDF. Переконайтеся що файл не захищений паролем і не пошкоджений." },
           { status: 400 }
         );
       }
