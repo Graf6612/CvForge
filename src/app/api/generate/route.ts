@@ -25,21 +25,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2. Check credits in profile
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("credits")
-      .eq("id", user.id)
-      .single();
-
-    if (profileError || !profile) {
-      return NextResponse.json(
-        { error: "Не вдалося отримати профіль користувача" },
-        { status: 500 }
-      );
-    }
-
-    // GOD MODE: Bypass credit check
+    // GOD MODE: Bypass profile Check completely
+    // const { data: profile, error: profileError } = await supabase
+    //   .from("profiles")
+    //   .select("credits")
+    //   .eq("id", user.id)
+    //   .single();
+    //
+    // if (profileError || !profile) {
+    //   return NextResponse.json(
+    //     { error: "Не вдалося отримати профіль користувача" },
+    //     { status: 500 }
+    //   );
+    // }
+    //
     // if (profile.credits < 1) {
     //   return NextResponse.json(
     //     { error: "Недостатньо кредитів. Будь ласка, поповніть баланс." },
