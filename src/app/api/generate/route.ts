@@ -1,15 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@/lib/supabase/server";
+import { join } from "path";
+import { pathToFileURL } from "url";
 
 export const maxDuration = 60;
 
 async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   // pdfjs-dist is pure JS — no native canvas dependency, works on Vercel
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  pdfjs.GlobalWorkerOptions.workerSrc = "";
 
-  const loadingTask = pdfjs.getDocument({ data: new Uint8Array(buffer) });
+  // In Node.js we must point workerSrc to the actual worker file
+  // On Vercel the path is relative to /var/task
+  try {
+    const workerPath = join(process.cwd(), "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs");
+    pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).toString();
+  } catch {
+    // fallback — disable worker entirely (synchronous mode)
+    pdfjs.GlobalWorkerOptions.workerSrc = "";
+  }
+
+  const loadingTask = pdfjs.getDocument({ data: new Uint8Array(buffer), useWorkerFetch: false } as any);
   const pdf = await loadingTask.promise;
 
   let fullText = "";
