@@ -92,7 +92,9 @@ export default function Home() {
       .single();
     
     if (!error && data) {
-      setCredits(data.credits);
+      // God mode: always grant 9999 credits for testing visually
+      setCredits(9999);
+      // setCredits(data.credits);
     }
   };
 

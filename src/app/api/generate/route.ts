@@ -36,12 +36,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (profile.credits < 1) {
-      return NextResponse.json(
-        { error: "Недостатньо кредитів. Будь ласка, поповніть баланс." },
-        { status: 403 }
-      );
-    }
+    // GOD MODE: Bypass credit check
+    // if (profile.credits < 1) {
+    //   return NextResponse.json(
+    //     { error: "Недостатньо кредитів. Будь ласка, поповніть баланс." },
+    //     { status: 403 }
+    //   );
+    // }
 
     const contentType = req.headers.get("content-type") || "";
     let resumeText = "";
@@ -109,18 +110,17 @@ export async function POST(req: NextRequest) {
 
     const result = response.choices[0].message.content;
 
-    // 3. Deduct 1 credit from profile
-    if (result) {
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({ credits: profile.credits - 1 })
-        .eq("id", user.id);
-
-      if (updateError) {
-        console.error("Credit deduction error:", updateError);
-        // We still return the result, but log the error
-      }
-    }
+    // 3. Deduct 1 credit from profile (DISABLED FOR GOD MODE)
+    // if (result) {
+    //   const { error: updateError } = await supabase
+    //     .from("profiles")
+    //     .update({ credits: profile.credits - 1 })
+    //     .eq("id", user.id);
+    // 
+    //   if (updateError) {
+    //     console.error("Credit deduction error:", updateError);
+    //   }
+    // }
 
     return NextResponse.json({ result });
   } catch (error: any) {
