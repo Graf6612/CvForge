@@ -2,19 +2,36 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@/lib/supabase/server";
 
-// Polyfills for Vercel Node.js environment to support pdf-parse-new (which relies on pdf.js)
-if (typeof (global as any).DOMMatrix === "undefined") {
-  (global as any).DOMMatrix = class DOMMatrix {};
+// Polyfills for Vercel Node.js environment to support pdf-parse
+// These MUST be defined at the top level before require('pdf-parse')
+if (typeof (global as any).DOMMatrix === 'undefined') {
+  (global as any).DOMMatrix = class DOMMatrix {
+    constructor() {}
+    static fromMatrix() { return new DOMMatrix(); }
+    multiply() { return new DOMMatrix(); }
+  };
 }
-if (typeof (global as any).Path2D === "undefined") {
-  (global as any).Path2D = class Path2D {};
+if (typeof (global as any).Path2D === 'undefined') {
+  (global as any).Path2D = class Path2D {
+    constructor() {}
+  };
 }
-if (typeof (global as any).ImageData === "undefined") {
-  (global as any).ImageData = class ImageData {};
+if (typeof (global as any).ImageData === 'undefined') {
+  (global as any).ImageData = class ImageData {
+    constructor() {}
+  };
+}
+if (typeof (global as any).DOMException === 'undefined') {
+  (global as any).DOMException = class DOMException extends Error {
+    constructor(message?: string, name?: string) {
+      super(message);
+      this.name = name || 'DOMException';
+    }
+  };
 }
 
-// Use pdf-parse-new to avoid Canvas/DOMMatrix polyfill crashes on Vercel Node runtimes
-const pdfParse = require("pdf-parse-new");
+// Now we can safely require the PDF library
+const pdfParse = require("pdf-parse");
 
 export const maxDuration = 60; // This tells Vercel to allow up to 60s for OpenAI generation
 
