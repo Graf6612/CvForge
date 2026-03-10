@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
-import * as pdfParseModule from "pdf-parse";
-const pdfParse = (pdfParseModule as any).default || pdfParseModule;
+import PDFParser from "pdf2json";
 import { createClient } from "@/lib/supabase/server";
 
 export const maxDuration = 60; // This tells Vercel to allow up to 60s for OpenAI generation
@@ -83,8 +82,15 @@ export async function POST(req: NextRequest) {
 
       const bytes = await resumeFile.arrayBuffer();
       const buffer = Buffer.from(bytes);
-      const data = await pdfParse(buffer);
-      resumeText = data.text;
+      
+      resumeText = await new Promise((resolve, reject) => {
+        const pdfParser = new PDFParser(null, true); // true = text only
+        pdfParser.on("pdfParser_dataError", (errData: any) => reject(new Error(errData.parserError)));
+        pdfParser.on("pdfParser_dataReady", () => {
+          resolve(pdfParser.getRawTextContent());
+        });
+        pdfParser.parseBuffer(buffer);
+      });
     }
 
     let systemPrompt = "";
