@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@/lib/supabase/server";
 
-// Ignore TypeScript errors for pdf-parse, CommonJS import works best dynamically
-const pdfParse = require("pdf-parse");
+// Use pdf-parse-new to avoid Canvas/DOMMatrix polyfill crashes on Vercel Node runtimes
+const pdfParse = require("pdf-parse-new");
 
 export const maxDuration = 60; // This tells Vercel to allow up to 60s for OpenAI generation
 
