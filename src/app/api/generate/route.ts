@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
-import PDFParser from "pdf2json";
 import { createClient } from "@/lib/supabase/server";
+
+// Ignore TypeScript errors for pdf-parse, CommonJS import works best dynamically
+const pdfParse = require("pdf-parse");
 
 export const maxDuration = 60; // This tells Vercel to allow up to 60s for OpenAI generation
 
@@ -33,27 +35,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // GOD MODE: Bypass profile Check completely
-    // const { data: profile, error: profileError } = await supabase
-    //   .from("profiles")
-    //   .select("credits")
-    //   .eq("id", user.id)
-    //   .single();
-    //
-    // if (profileError || !profile) {
-    //   return NextResponse.json(
-    //     { error: "Не вдалося отримати профіль користувача" },
-    //     { status: 500 }
-    //   );
-    // }
-    //
-    // if (profile.credits < 1) {
-    //   return NextResponse.json(
-    //     { error: "Недостатньо кредитів. Будь ласка, поповніть баланс." },
-    //     { status: 403 }
-    //   );
-    // }
-
     const contentType = req.headers.get("content-type") || "";
     let resumeText = "";
     let jobDescription = "";
@@ -83,14 +64,20 @@ export async function POST(req: NextRequest) {
       const bytes = await resumeFile.arrayBuffer();
       const buffer = Buffer.from(bytes);
       
-      resumeText = await new Promise((resolve, reject) => {
-        const pdfParser = new PDFParser(null, true); // true = text only
-        pdfParser.on("pdfParser_dataError", (errData: any) => reject(new Error(errData.parserError)));
-        pdfParser.on("pdfParser_dataReady", () => {
-          resolve(pdfParser.getRawTextContent());
-        });
-        pdfParser.parseBuffer(buffer);
-      });
+      try {
+        const data = await pdfParse(buffer);
+        resumeText = data.text;
+        
+        if (!resumeText || resumeText.trim().length === 0) {
+          throw new Error("Не вдалося прочитати текст з цього PDF. Файл може бути пошкодженим або мати лише зображення.");
+        }
+      } catch (pdfError: any) {
+        console.error("PDF Parse error:", pdfError);
+        return NextResponse.json(
+          { error: "Не вдалося розпізнати PDF-файл. Переконайтеся, що файл містить текст, а не лише картинку (або скасуйте пароль)." },
+          { status: 400 }
+        );
+      }
     }
 
     let systemPrompt = "";
