@@ -2,6 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@/lib/supabase/server";
 
+// Polyfills for Vercel Node.js environment to support pdf-parse-new (which relies on pdf.js)
+if (typeof (global as any).DOMMatrix === "undefined") {
+  (global as any).DOMMatrix = class DOMMatrix {};
+}
+if (typeof (global as any).Path2D === "undefined") {
+  (global as any).Path2D = class Path2D {};
+}
+if (typeof (global as any).ImageData === "undefined") {
+  (global as any).ImageData = class ImageData {};
+}
+
 // Use pdf-parse-new to avoid Canvas/DOMMatrix polyfill crashes on Vercel Node runtimes
 const pdfParse = require("pdf-parse-new");
 
