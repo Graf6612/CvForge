@@ -3,6 +3,8 @@ import OpenAI from "openai";
 import { PDFParse } from "pdf-parse";
 import { createClient } from "@/lib/supabase/server";
 
+export const maxDuration = 60; // This tells Vercel to allow up to 60s for OpenAI generation
+
 // Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
