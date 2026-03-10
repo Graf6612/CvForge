@@ -116,7 +116,13 @@ export default function Home() {
   // --- Handlers ---
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+      const selectedFile = e.target.files[0];
+      if (selectedFile.size > 4 * 1024 * 1024) { // 4MB limit
+        alert("Файл занадто великий. Максимальний розмір - 4 МБ.");
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+      setFile(selectedFile);
     }
   };
 
@@ -202,8 +208,21 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || "Помилка генерації");
+        let errMessage = "Сервер повернув помилку " + response.status;
+        const contentType = response.headers.get("content-type");
+        
+        if (contentType && contentType.includes("application/json")) {
+          const errData = await response.json();
+          errMessage = errData.error || errMessage;
+        } else {
+          // If not JSON, it's likely an HTML error page from Vercel timeout (504) or payload too large (413)
+          if (response.status === 413) {
+            errMessage = "Файл резюме занадто великий (макс 4MB).";
+          } else if (response.status === 504) {
+             errMessage = "Час очікування вичерпано. Сервер не встиг обробити запит.";
+          }
+        }
+        throw new Error(errMessage);
       }
 
       const data = await response.json();
