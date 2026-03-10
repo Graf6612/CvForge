@@ -6,14 +6,23 @@ import { createClient } from "@/lib/supabase/server";
 
 export const maxDuration = 60; // This tells Vercel to allow up to 60s for OpenAI generation
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// OpenAI is initialized inside the request to catch missing API key errors safely
 
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
+
+    // Initialize OpenAI client inside try/catch so missing keys are reported nicely
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json(
+        { error: "API Ключ OpenAI не налаштовано на сервері (Vercel)." },
+        { status: 500 }
+      );
+    }
+    
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
     
     // 1. Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
